@@ -1,7 +1,7 @@
 /* eslint-disable react/display-name */
 import React, {
-  ComponentPropsWithoutRef,
-  ComponentType,
+  ComponentPropsWithRef,
+  ElementType,
   createContext,
   createElement,
   forwardRef,
@@ -22,13 +22,17 @@ import { ViewStyle, TextStyle, ImageStyle } from 'react-native'
  * styl.d.ts
  *
  * declare module 'react-native-styl' {
- *  export interface DefaultTheme extends MyCustomTheme {}
+ *  export interface DefaultTheme {
+ *    colors: {
+ *      main: string;
+ *      secondary: string;
+ *    };
+ *  }
  * }
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type DefaultTheme = any
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface DefaultTheme {}
 
-// Style
 type StyleProperties = ViewStyle | TextStyle | ImageStyle
 
 type StylesWithTheme<P> = (args: {
@@ -38,11 +42,19 @@ type StylesWithTheme<P> = (args: {
 
 type Styles<P> = StylesWithTheme<P> | StyleProperties
 
-type ForwardedProps<
-  Comp extends ComponentType<unknown>,
-  Props extends object
-> = ComponentPropsWithoutRef<Comp> &
-  Props & { children?: ReactNode; as?: ComponentType<any> }
+type AsProp<C extends ElementType> = {
+  as?: C
+}
+
+type PolyProps<C extends ElementType, P = unknown> = AsProp<C> &
+  Omit<ComponentPropsWithRef<C>, keyof AsProp<C>> &
+  P & { children?: ReactNode }
+
+type PolyComponent<C extends ElementType, P = unknown> = <
+  E extends ElementType = C
+>(
+  props: PolyProps<E, P>
+) => JSX.Element | null
 
 /**
  * Context
@@ -69,10 +81,19 @@ const Context = createContext({ theme: {} })
  * )
  * ```
  */
-const Provider: React.FC<{ theme: Record<string, unknown> }> = ({
-  children,
-  theme,
-}) => createElement(Context.Provider, { value: { theme }, children })
+const Provider: React.FC<{ theme: DefaultTheme }> = ({ children, theme }) =>
+  createElement(Context.Provider, { value: { theme }, children })
+
+/**
+ * useTheme
+ *
+ * Expose the `theme` as a React hook
+ */
+const useTheme = (): DefaultTheme => {
+  const { theme } = useContext(Context)
+
+  return theme
+}
 
 /**
  * styl
@@ -92,13 +113,11 @@ const Provider: React.FC<{ theme: Record<string, unknown> }> = ({
  * const BigTitle = styl(Title)({ fontSize: 40 })
  * ```
  */
-const styl = <Comp extends ComponentType<any>>(Component: Comp) => <
-  Props extends object = object
->(
-  stylesProp: Styles<Props>
-) => {
-  return forwardRef<unknown, ForwardedProps<Comp, Props>>(
-    function ForwardedComponent(props, ref) {
+const styl = <Comp extends ElementType>(Component: Comp) => {
+  return <Props extends object = object>(
+    stylesProp: Styles<Props>
+  ): PolyComponent<Comp, Props> => {
+    return forwardRef((props: PolyProps<Comp, any>, ref: typeof props.ref) => {
       // Get theme from context
       const { theme } = useContext(Context)
 
@@ -117,8 +136,8 @@ const styl = <Comp extends ComponentType<any>>(Component: Comp) => <
         ref,
         style: { ...styles, ...inlineStyles },
       })
-    }
-  )
+    })
+  }
 }
 
-export { styl, Provider }
+export { styl, Provider, useTheme }

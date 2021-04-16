@@ -63,6 +63,9 @@ const App = () => {
 
         {/*  */}
         <Title>Dynamic styles</Title>
+        <Title as={TouchableOpacity}>Touchable</Title>
+        <Title as={TouchableOpacity} activeOpacity={0.5}>Touchable</Title>
+        <Title as={ScrollView}>Scroll</Title>
         <DynamicText color="red">Example of {`<DynamicText />`}</DynamicText>
         <Highlighter>
           {`const DynamicText = styl(Text)(({ props }) => ({

@@ -1,7 +1,7 @@
 /* eslint-disable react/display-name */
 import React, {
-  ComponentPropsWithoutRef,
-  ComponentType,
+  ComponentPropsWithRef,
+  ElementType,
   createContext,
   createElement,
   forwardRef,
@@ -33,7 +33,6 @@ import { ViewStyle, TextStyle, ImageStyle } from 'react-native'
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface DefaultTheme {}
 
-// Style
 type StyleProperties = ViewStyle | TextStyle | ImageStyle
 
 type StylesWithTheme<P> = (args: {
@@ -43,11 +42,19 @@ type StylesWithTheme<P> = (args: {
 
 type Styles<P> = StylesWithTheme<P> | StyleProperties
 
-type ForwardedProps<
-  Comp extends ComponentType<unknown>,
-  Props extends object
-> = ComponentPropsWithoutRef<Comp> &
-  Props & { children?: ReactNode; as?: ComponentType<any> }
+type AsProp<C extends ElementType> = {
+  as?: C
+}
+
+type PolyProps<C extends ElementType, P = unknown> = AsProp<C> &
+  Omit<ComponentPropsWithRef<C>, keyof AsProp<C>> &
+  P & { children?: ReactNode }
+
+type PolyComponent<C extends ElementType, P = unknown> = <
+  E extends ElementType = C
+>(
+  props: PolyProps<E, P>
+) => JSX.Element | null
 
 /**
  * Context
@@ -106,13 +113,11 @@ const useTheme = (): DefaultTheme => {
  * const BigTitle = styl(Title)({ fontSize: 40 })
  * ```
  */
-const styl = <Comp extends ComponentType<any>>(Component: Comp) => <
-  Props extends object = object
->(
-  stylesProp: Styles<Props>
-) => {
-  return forwardRef<unknown, ForwardedProps<Comp, Props>>(
-    function ForwardedComponent(props, ref) {
+const styl = <Comp extends ElementType>(Component: Comp) => {
+  return <Props extends object = object>(
+    stylesProp: Styles<Props>
+  ): PolyComponent<Comp, Props> => {
+    return forwardRef((props: PolyProps<Comp, any>, ref: typeof props.ref) => {
       // Get theme from context
       const { theme } = useContext(Context)
 
@@ -129,13 +134,10 @@ const styl = <Comp extends ComponentType<any>>(Component: Comp) => <
       return createElement(as || Component, {
         ...restProps,
         ref,
-        style: [
-          styles,
-          ...(Array.isArray(inlineStyles) ? inlineStyles : [inlineStyles]),
-        ],
+        style: { ...styles, ...inlineStyles },
       })
-    }
-  )
+    })
+  }
 }
 
 export { styl, Provider, useTheme }
